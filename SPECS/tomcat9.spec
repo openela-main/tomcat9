@@ -31,8 +31,8 @@
 %global jspspec 2.3
 %global major_version 9
 %global minor_version 0
-%global micro_version 87
-%global packdname tomcat-%{major_version}.%{minor_version}.%{micro_version}.redhat-00013-src
+%global micro_version 110
+%global packdname apache-tomcat-%{major_version}.%{minor_version}.%{micro_version}-src
 %global servletspec 4.0
 %global elspec 3.0
 %global tcuid 53
@@ -53,12 +53,12 @@
 Name:          tomcat9
 Epoch:         1
 Version:       %{major_version}.%{minor_version}.%{micro_version}
-Release:       8%{?dist}.1
+Release:       3%{?dist}
 Summary:       Apache Servlet/JSP Engine, RI for Servlet %{servletspec}/JSP %{jspspec} API
 
 License:       Apache-2.0
 URL:           http://tomcat.apache.org/
-Source0:       %{packdname}.zip
+Source0:       %{packdname}.tar.gz
 Source1:       tomcat-%{major_version}.%{minor_version}.conf
 Source3:       tomcat-%{major_version}.%{minor_version}.sysconfig
 Source4:       tomcat-%{major_version}.%{minor_version}.wrapper
@@ -77,20 +77,22 @@ Patch1:        tomcat-%{major_version}.%{minor_version}-tomcat-users-webapp.patc
 Patch3:        tomcat-%{major_version}.%{minor_version}-catalina-policy.patch
 Patch4:        rhbz-1857043.patch
 Patch6:        tomcat-%{major_version}.%{minor_version}-bnd-annotation.patch
-Patch7:        JmxRemoteLifecycleListener.patch
+Patch7:        build-with-java-25.patch
+Patch8:        rhel-158962.patch
+Patch9:        rhel-168243.patch
 
 BuildArch:     noarch
 
 BuildRequires: ant
 BuildRequires: ecj >= 1:4.10
 BuildRequires: findutils
-BuildRequires: java-devel
 BuildRequires: javapackages-local
 BuildRequires: aqute-bnd
 BuildRequires: aqute-bndlib
 BuildRequires: systemd
+BuildRequires: java-25-devel
 
-Requires:      java-headless
+Requires:      (java-headless or java-25-headless)
 Requires:      javapackages-tools
 Requires:      %{name}-lib = %{epoch}:%{version}-%{release}
 
@@ -199,7 +201,7 @@ Obsoletes: tomcat-webapps < 1:10.0.0-1
 The ROOT web application for Apache Tomcat.
 
 %prep
-%setup -q -n apache-%{packdname}
+%setup -q -n %{packdname}
 # remove pre-built binaries and windows files
 find . -type f \( -name "*.bat" -o -name "*.class" -o -name Thumbs.db -o -name "*.gz" -o \
    -name "*.jar" -o -name "*.war" -o -name "*.zip" \) -delete
@@ -209,7 +211,9 @@ find . -type f \( -name "*.bat" -o -name "*.class" -o -name Thumbs.db -o -name "
 %patch -P3 -p0
 %patch -P4 -p0
 %patch -P6 -p0
-%patch -P7 -p1
+%patch -P7 -p0
+%patch -P8 -p1
+%patch -P9 -p1
 
 # Remove webservices naming resources as it's generally unused
 %{__rm} -rf java/org/apache/naming/factory/webservices
@@ -229,8 +233,12 @@ export OPT_JAR_LIST="xalan-j2-serializer"
 # so just create a dummy file for later removal
 touch HACK
 
+# Adding JAVA_HOME to always compile with java-25 instead of autodetecting
+export JAVA_HOME=%{_jvmdir}/java-25-openjdk
+export PATH=$JAVA_HOME/bin:$PATH
+
 # who needs a build.properties file anyway
-%{ant} -Dbase.path="." \
+ant -Dbase.path="." \
   -Dbuild.compiler="modern" \
   -Dcommons-daemon.jar="HACK" \
   -Dcommons-daemon.native.src.tgz="HACK" \
@@ -249,6 +257,9 @@ touch HACK
 
 # remove some jars that we'll replace with symlinks later
 %{__rm} output/build/lib/ecj.jar
+# Cleanup commons-daemon.jar that somehow appeared since last build, but is unnecessary
+%{__rm} -rf output/build/bin/commons-daemon.jar
+
 # Remove the example webapps per Apache Tomcat Security Considerations
 # see https://tomcat.apache.org/tomcat-9.0-doc/security-howto.html
 %{__rm} -rf output/build/webapps/examples
@@ -395,6 +406,9 @@ popd
 
 %mvn_file org.apache.tomcat:tomcat-coyote tomcat/tomcat-coyote
 %mvn_artifact res/maven/tomcat-coyote.pom ${RPM_BUILD_ROOT}%{libdir}/tomcat-coyote.jar
+
+%mvn_file org.apache.tomcat:tomcat-coyote-ffm tomcat/tomcat-coyote-ffm
+%mvn_artifact res/maven/tomcat-coyote-ffm.pom ${RPM_BUILD_ROOT}%{libdir}/tomcat-coyote-ffm.jar
 
 %mvn_file org.apache.tomcat:tomcat-dbcp tomcat/tomcat-dbcp
 %mvn_artifact res/maven/tomcat-dbcp.pom ${RPM_BUILD_ROOT}%{libdir}/tomcat-dbcp.jar
@@ -622,10 +636,20 @@ fi
 %{appdir}/ROOT
 
 %changelog
-* Thu Nov 27 2025 Adam Krajcik <akrajcik@redhat.com> - 1:9.0.87-8.el10_1.1
-- Resolves: RHEL-124497
+* Tue Apr 14 2026 Coty Sutherland <csutherl@redhat.com> - 1:9.0.110-3
+- Resolves: RHEL-168243 Fix copy/paste error in AJP connector that caused DELETE requests to be processed as OPTIONS requests (BZ#69848)
+
+* Mon Mar 23 2026 Coty Sutherland <csutherl@redhat.com> - 1:9.0.110-2
+- Resolves: RHEL-158962 NPE in tomcat9 when used with TLS enabled custom connector
+
+* Wed Feb 11 2026 Coty Sutherland <csutherl@redhat.com> - 1:9.0.110-1
+- Resolves: RHEL-148687
+  Update to 9.0.110 and compile with Java 25 to enable FFM features for PQC support
+
+* Fri Jan 23 2026 Pietro Meloni <pmeloni@redhat.com> - 1:9.0.87-9
+- Resolves: RHEL-124496
   tomcat: Directory traversal via rewrite with possible RCE (CVE-2025-55752)
-- Resolves: RHEL-91732
+- Resolves: RHEL-132559
   tomcat: Bypass of rules in Rewrite Valve (CVE-2025-31651)
 
 * Mon Aug 18 2025 Adam Krajcik <akrajcik@redhat.com> - 1:9.0.87-8
