@@ -53,7 +53,7 @@
 Name:          tomcat9
 Epoch:         1
 Version:       %{major_version}.%{minor_version}.%{micro_version}
-Release:       1%{?dist}
+Release:       2%{?dist}
 Summary:       Apache Servlet/JSP Engine, RI for Servlet %{servletspec}/JSP %{jspspec} API
 
 License:       Apache-2.0
@@ -78,6 +78,7 @@ Patch3:        tomcat-%{major_version}.%{minor_version}-catalina-policy.patch
 Patch4:        rhbz-1857043.patch
 Patch6:        tomcat-%{major_version}.%{minor_version}-bnd-annotation.patch
 Patch7:        build-with-java-25.patch
+Patch8:        rhel-168577.patch
 
 BuildArch:     noarch
 
@@ -210,6 +211,7 @@ find . -type f \( -name "*.bat" -o -name "*.class" -o -name Thumbs.db -o -name "
 %patch -P4 -p0
 %patch -P6 -p0
 %patch -P7 -p0
+%patch -P8 -p1
 
 # Remove webservices naming resources as it's generally unused
 %{__rm} -rf java/org/apache/naming/factory/webservices
@@ -220,6 +222,9 @@ find . -type f \( -name "*.bat" -o -name "*.class" -o -name Thumbs.db -o -name "
 %mvn_package ":tomcat-jsp-api" tomcat-jsp-api
 %mvn_alias "org.apache.tomcat:tomcat-jsp-api" "org.eclipse.jetty.orbit:javax.servlet.jsp"
 %mvn_package ":tomcat-servlet-api" tomcat-servlet-api
+
+%pom_remove_dep org.apache.tomcat:tomcat-tribes res/maven/tomcat-storeconfig.pom
+%pom_remove_dep org.apache.tomcat:tomcat-catalina-ha res/maven/tomcat-storeconfig.pom
 
 
 %build
@@ -291,6 +296,10 @@ pushd output/build
     %{__cp} -a lib/*.jar ${RPM_BUILD_ROOT}%{libdir}
     %{__cp} -a webapps/* ${RPM_BUILD_ROOT}%{appdir}
 popd
+
+# Clustering is unsupported in RHEL
+rm -f ${RPM_BUILD_ROOT}%{libdir}/catalina-ha.jar
+rm -f ${RPM_BUILD_ROOT}%{libdir}/catalina-tribes.jar
 
 %{__sed} -e "s|\@\@\@TCHOME\@\@\@|%{homedir}|g" \
    -e "s|\@\@\@TCTEMP\@\@\@|%{tempdir}|g" \
@@ -394,9 +403,6 @@ popd
 %mvn_file org.apache.tomcat:tomcat-catalina-ant tomcat/catalina-ant
 %mvn_artifact res/maven/tomcat-catalina-ant.pom ${RPM_BUILD_ROOT}%{libdir}/catalina-ant.jar
 
-%mvn_file org.apache.tomcat:tomcat-catalina-ha tomcat/catalina-ha
-%mvn_artifact res/maven/tomcat-catalina-ha.pom ${RPM_BUILD_ROOT}%{libdir}/catalina-ha.jar
-
 %mvn_file org.apache.tomcat:tomcat-catalina tomcat/catalina
 %mvn_artifact res/maven/tomcat-catalina.pom ${RPM_BUILD_ROOT}%{libdir}/catalina.jar
 
@@ -459,9 +465,6 @@ popd
 
 %mvn_file org.apache.tomcat:tomcat-storeconfig tomcat/catalina-storeconfig
 %mvn_artifact res/maven/tomcat-storeconfig.pom ${RPM_BUILD_ROOT}%{libdir}/catalina-storeconfig.jar
-
-%mvn_file org.apache.tomcat:tomcat-tribes tomcat/catalina-tribes
-%mvn_artifact res/maven/tomcat-tribes.pom ${RPM_BUILD_ROOT}%{libdir}/catalina-tribes.jar
 
 %mvn_file org.apache.tomcat:tomcat-util-scan tomcat/tomcat-util-scan
 %mvn_artifact res/maven/tomcat-util-scan.pom ${RPM_BUILD_ROOT}%{libdir}/tomcat-util-scan.jar
@@ -632,6 +635,9 @@ fi
 %{appdir}/ROOT
 
 %changelog
+* Wed Jun 17 2026 Pietro Meloni <pmeloni@redhat.com> - 1:9.0.117-2
+- Resolves: RHEL-185571 Remove tomcat clustering JAR from RPM builds
+
 * Thu May 29 2026 Pietro Meloni <pmeloni@redhat.com> - 1:9.0.117-1
 - Resolves: RHEL-150720
   Tomcat: Certificate revocation bypass due to improper OCSP response validation (CVE-2026-24734)
