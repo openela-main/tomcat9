@@ -31,7 +31,7 @@
 %global jspspec 2.3
 %global major_version 9
 %global minor_version 0
-%global micro_version 117
+%global micro_version 120
 %global packdname apache-tomcat-%{major_version}.%{minor_version}.%{micro_version}-src
 %global servletspec 4.0
 %global elspec 3.0
@@ -53,7 +53,7 @@
 Name:          tomcat9
 Epoch:         1
 Version:       %{major_version}.%{minor_version}.%{micro_version}
-Release:       2%{?dist}
+Release:       1%{?dist}
 Summary:       Apache Servlet/JSP Engine, RI for Servlet %{servletspec}/JSP %{jspspec} API
 
 License:       Apache-2.0
@@ -78,7 +78,6 @@ Patch3:        tomcat-%{major_version}.%{minor_version}-catalina-policy.patch
 Patch4:        rhbz-1857043.patch
 Patch6:        tomcat-%{major_version}.%{minor_version}-bnd-annotation.patch
 Patch7:        build-with-java-25.patch
-Patch8:        rhel-168577.patch
 
 BuildArch:     noarch
 
@@ -211,7 +210,6 @@ find . -type f \( -name "*.bat" -o -name "*.class" -o -name Thumbs.db -o -name "
 %patch -P4 -p0
 %patch -P6 -p0
 %patch -P7 -p0
-%patch -P8 -p1
 
 # Remove webservices naming resources as it's generally unused
 %{__rm} -rf java/org/apache/naming/factory/webservices
@@ -635,6 +633,16 @@ fi
 %{appdir}/ROOT
 
 %changelog
+* Mon Jul 20 2026 Pietro Meloni <pmeloni@redhat.com> - 1:9.0.120-1
+- Resolves: RHEL-192649 Tomcat9: Improper Input Validation vulnerability due to incomplete fix (CVE-2026-32990)
+- Resolves: RHEL-192818 Tomcat9: HTTP/2 request headers not validated (CVE-2026-41293)
+- Resolves: RHEL-219582 Tomcat9: Insufficient documentation for EncryptInterceptor may lead to insecure configurations (CVE-2026-59084)
+- Resolves: RHEL-219556 Tomcat9: Security constraint bypass via improper URL encoding in rewrite valve (CVE-2026-59083)
+- Resolves: RHEL-238296 tomcat9: Authentication bypass via digest authentication (CVE-2026-43512)
+- Resolves: RHEL-238255 tomcat9: Improper Authorization allows security bypass (CVE-2026-43515)
+- Resolves: RHEL-238232 tomcat9: Improper Handling of Case Sensitivity in LockOutRealm (CVE-2026-43513)
+- Resolves: RHEL-238193 tomcat9: Information disclosure due to HTTP Authentication Header exposure during WebSocket authentication (CVE-2026-42498)
+
 * Wed Jun 17 2026 Pietro Meloni <pmeloni@redhat.com> - 1:9.0.117-2
 - Resolves: RHEL-185571 Remove tomcat clustering JAR from RPM builds
 
